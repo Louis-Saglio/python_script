@@ -1,0 +1,91 @@
+import os
+from time import time
+import tarfile
+
+
+def get_modified_files_since(last_save_timestamp, root):
+    modified_files = []
+    for folder, sub_folders, files in os.walk(root):
+        for file in files:
+            file_path = folder + '/' + file
+            if os.path.getmtime(file_path) > last_save_timestamp:
+                modified_files.append(file_path)
+    return modified_files
+
+
+def main(data_file, dir_to_be_saved, dir_where_to_save):
+    with open(data_file, 'r') as f:
+        last_save_date = f.read()
+    modified_files = get_modified_files_since(float(last_save_date), dir_to_be_saved)
+    print(modified_files)
+    tar = tarfile.open(dir_where_to_save + '/' + "dir_to_be_saved" + '.tar', "a")
+    for file in modified_files:
+        tar.add(file)
+    tar.close()
+    with open(data_file, 'w') as f:
+        f.write(str(time()))
+
+
+if __name__ == '__main__':
+    main("/home/louis/Projects/Usefull_scripts/resume", "/home/louis/Projects/Usefull_scripts/", '/home/louis')
+
+
+
+#! /bin/python3.6
+
+"""
+Auteur : Louis Saglio
+Date : 12 octobre 2017
+Description : Effectue une sauvegarde incrémentale entre deux dossiers
+"""
+
+import os
+import json
+import tarfile
+
+
+config_file = "./config.json"
+
+with open(config_file, "r") as f:
+    config = json.load(f)
+
+archive_path = config["where_to_save"] + config["archive_name"]
+
+
+def prettify_path(path, root):
+    return path[len(root):]
+
+
+def get_modified_files_since(last_save_timestamp, root):
+    """
+    Renvoie la liste des fichiers dans root modifiés depuis last_save_timestamp
+    """
+    modified_files = []
+    for folder, sub_folders, files in os.walk(root):
+        for file in files:
+            file_path = folder + '/' + file
+            if os.path.getmtime(file_path) > last_save_timestamp:
+                modified_files.append(file_path)
+    # return [root.split('/')[-1] + prettify_path(file, root) for file in modified_files]
+    return modified_files
+
+
+def extract_targz_into(path, targz_src):
+    tar = tarfile.open(path, 'r:gz')
+    tar.extractall('/'.join(targz_src.split("/")[:-1]) + '/')
+    tar.close()
+
+
+def replace_with_new_files(files, src_dir, save_dir):
+    for file in get_modified_files_since(config["last_save_date"], config["directory_to_save"]):
+        print(file)
+        # print(config["directory_to_save"][:-len("data")] + file)
+        # print('/'.join(config["where_to_save"].split("/")[:-1]) + '/' + file)
+
+
+if __name__ == '__main__':
+    files_to_save = get_modified_files_since(config["last_save_date"], config["directory_to_save"])
+    extract_targz_into(config["where_to_save"], config["where_to_save"])
+    print(*files_to_save)
+    # replace_with_new_files(files_to_save, config[""])
+    # print(prettify_path(files_to_save[0], '/home/louis'))

@@ -1,0 +1,11 @@
+scanner un fs
+lister les fichiers modifiés
+récupérer l'archive
+    si elle n'existe pas, la créer
+la décompresser
+la désarchiver
+remplacer les fichiers modifiés
+réarchiver
+recompresser
+
+remplacer les fichiers modifiés(liste des fichiers modifiés, racine_src, racine_save):

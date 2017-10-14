@@ -1,0 +1,51 @@
+#! /bin/python
+from time import sleep
+
+FILE = "/home/louis/Cours/Scripting/python_script/myfile"
+NBR = 57
+SLEEP = 3
+
+
+def get_answer(value, test):
+    print("Get answer", "value", value, "test", test)
+    rep = "Erreur inconnue"
+    try:
+        value = int(value)
+        if value == test:
+            rep = "Bravo"
+        elif value > test:
+            rep = "Trop grand"
+        elif value < test:
+            rep = "Trop petit"
+    except (TypeError, ValueError) as e:
+        rep = "Mauvais format"
+    print("réponse", rep)
+    return rep
+
+
+def read_file(file):
+    print("readfile")
+    with open(file, 'r') as f:
+        return f.read().split("\n")[0]
+
+
+def write_into_file(file, text):
+    print("write into file")
+    with open(file, 'w') as f:
+        f.write(text)
+
+
+def main(file, number_to_guess):
+    user_number = read_file(file)
+    answer = get_answer(number_to_guess, user_number)
+    write_into_file(file, answer)
+
+
+def main_daemon(file, number_to_guess, pause_time):
+    while True:
+        main(file, number_to_guess)
+        sleep(pause_time)
+
+
+if __name__ == '__main__':
+    main_daemon(FILE, NBR, SLEEP)

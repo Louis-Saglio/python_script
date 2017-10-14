@@ -1,0 +1,34 @@
+from random import randint
+
+from plusoumoins.helpers import print_into_file, file_input
+
+
+def get_answer(value, test):
+    assert isinstance(value, int)
+    assert isinstance(test, int)
+    if value == test:
+        rep = "Bravo"
+    elif value > test:
+        rep = "Trop grand"
+    elif value < test:
+        rep = "Trop petit"
+    else:
+        rep = "Erreur"
+    return rep
+
+
+MIN, MAX = 0, 100
+NUMBER = randint(MIN, MAX)
+FILE = "/home/louis/Cours/Scripting/python_script/myfile"
+
+i = 0
+user_input = ''
+print_into_file(FILE, user_input)
+while True:
+    try:
+        user_input = int(file_input(FILE, str(user_input)))
+    except ValueError:
+        continue
+    answer = get_answer(user_input, NUMBER)
+    i += 1
+    print_into_file(FILE, answer)
