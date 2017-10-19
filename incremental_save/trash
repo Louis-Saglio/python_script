@@ -89,3 +89,29 @@ if __name__ == '__main__':
     print(*files_to_save)
     # replace_with_new_files(files_to_save, config[""])
     # print(prettify_path(files_to_save[0], '/home/louis'))
+
+
+
+def get_files_to_compare(dest_path, src_path, archive_name):
+    saved_root = safe_extract_targz(dest_path, archive_name, src_path)
+    files = {"src": [], "dest": []}
+
+    for src, dest in itertools.zip_longest(os.walk(src_path), (os.walk(saved_root)), fillvalue=None):
+        src_directory, src_sub_dir, src_files = src
+        dest_directory, dest_sub_dir, dest_files = dest
+        print(src)
+        print(dest, '\n')
+
+    return files
+
+    for src_file, dest_file in zip_file_list(rlistdir(data["src_path"]), rlistdir(untared_dir)):
+        if os.path.getmtime(src_file) > os.path.getmtime(dest_file):
+            message = "modifié"
+        elif src_file is None:
+            message = "supprimé"
+        elif dest_file is None:
+            message = "créé"
+        else:
+            message = "Cool"
+        print(src_file)
+        print(dest_file, message, '\n')
