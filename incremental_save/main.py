@@ -1,7 +1,7 @@
 import json
 import sys
 import os
-import itertools
+import shutil
 
 
 # CONFIG_FILE = os.path.normpath(os.path.expanduser("~/.pysync"))
@@ -66,7 +66,7 @@ def safe_extract_targz(dest_path, archive_name, src_path):
         os.remove(data["dest_path"] + data["archive_name"])
     else:
         basename = src_path.split(os.sep)[-2]
-        os.makedirs(os.path.join(dest_path, basename), 0o600, True)
+        os.makedirs(os.path.join(dest_path, basename), 0o700, True)
     return os.path.join(dest_path, basename)
 
 
@@ -97,10 +97,26 @@ def move_item_in_list(liste: list, obj, index):
     return liste
 
 
+def process_file_info(src_files, dest_files, dest_path):
+    # todo: file_cmp
+    for src_file, dest_file in zip(src_files, dest_files):
+        if dest_file:
+            os.makedirs(os.path.split(dest_file)[0], 0o700, exist_ok=True)
+        if not src_file:
+            print(src_file, "Supprimé")
+            os.remove(dest_file)
+        elif not dest_file:
+            print(src_file, "Nouveau")
+            shutil.copyfile(src_file, os.path.join(dest_path, os.path.split(src_file)[1]))
+        elif os.path.getmtime(src_file) >= os.path.getmtime(dest_file):
+            print(src_file, "Modifié")
+            shutil.copyfile(src_file, dest_file)
+        elif not (src_file and dest_file):
+            raise SyntaxError
+
+
 def zip_file_list(src_files, dest_files, src_path, untared_root):
-    rep = {"src_files": src_files, "dest_files": dest_files}
     for i in range(max(len(src_files), len(dest_files))):
-        input()
         if i >= len(src_files):
             src_files.append(None)
             continue
@@ -110,15 +126,10 @@ def zip_file_list(src_files, dest_files, src_path, untared_root):
         src_file = del_root(src_files[i], src_path)
         dest_file = del_root(dest_files[i], untared_root)
         if src_file != dest_file:
-            # si src_files[i] n'existe pas on le créé à None
-            # si src_file in dest_files on déplace dest_file correspondant à l'index de src_file
             if os.path.join(untared_root, src_file) in dest_files:
                 dest_files = move_item_in_list(dest_files, os.path.join(untared_root, src_file), i)
-            # sinon on insère None dans dest_file à i
             else:
                 dest_files.insert(i, None)
-        print(src_files[i])
-        print(dest_files[i])
     return src_files, dest_files
 
 
@@ -144,7 +155,11 @@ if __name__ == '__main__':
         raise_error(f"La source {data['src_path']} n'existe pas ou n'est pas un dossier")
 
     untared_dir = safe_extract_targz(**data)
+    print("kyhtf", untared_dir)
+    print(data["src_path"])
 
-    print(zip_file_list(rlistdir(data["src_path"]), rlistdir(untared_dir), data["src_path"], untared_dir))
+    src_files, dest_files = zip_file_list(rlistdir(data["src_path"]), rlistdir(untared_dir), data["src_path"], untared_dir)
+
+    process_file_info(src_files, dest_files, untared_dir)
 
     print("Synchronisation effectuée avec succès !", data)
