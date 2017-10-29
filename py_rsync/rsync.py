@@ -1,3 +1,6 @@
+__author__ = "Louis Saglio"
+__date__ = "29/10/2017"
+
 import sys
 import os
 import json
@@ -6,26 +9,55 @@ import time
 import shutil
 import signal
 import paramiko
-from pprint import pprint
-
-CONFIG_FILE = os.path.normpath(os.path.expanduser("~/Cours/Scripting/python_script/py_rsync/config.json"))
-
-# TODO: générer last_save_timestamp
 
 
 def raise_error(message, return_code=1):
-    sys.stdout.buffer.write(bytes(message, encoding="utf-8"))
+    sys.stdout.buffer.write(bytes(message + '\n', encoding="utf-8"))
     sys.exit(return_code)
 
 
+if sys.version_info.major < 3 or sys.version_info.minor < 6:
+    raise_error("Vous devez utiliser Python 3.6 au plus pour pouvoir lancer ce script", 1)
+
+
+CONFIG_FILE = os.path.normpath(os.path.expanduser("config.json"))
+
+
+def get_help():
+    return """    Python 3.6 est nécessaire pour lancer ce script !
+    Usage :
+    pyrsync src dest [ip_ssh login_ssh password_ssh dir_where_to_save_on_ssh]
+    pyrsync (without arguments) : will use ./config.json to choose arguments (for ssh, must provide cli arguments)
+    If you want to provide an other path for config.json, fill the CONFIG_FILE global variable at line 14 in pyrsync file
+    If no config.json file is found, it will be created
+    Exemples:
+    pyrsync /home/user/folder /home/user/save_here/archive.tar.gz
+    pyrsync
+    pyrsync /home/user/folder /home/user/save_here/archive.tar.gz 192.168.10.10 admin Passw0rd
+    """
+
+
+def get_or_create_conf_file(path):
+    if not os.path.isfile(path):
+        with open(path, 'w') as f:
+            json.dump({
+                "last_save_date": 0,
+                "src_path": os.path.expanduser("~"),
+                "dest_path": os.path.join(os.path.expanduser("~"), "save.tar.gz"),
+                "last_save_timestamp": 0
+            }, f)
+
+
 def handle_ssh_args(args):
-    if len(args) < 3:
-        return None, args
+    if len(args) <= 2:
+        return None, args, None
     try:
-        server, login, password = args[2], args[3], args[4]
+        server, login, password, remote_dest = args[2], args[3], args[4], args[5]
         ssh = paramiko.SSHClient()
         ssh.connect(server, username=login, password=password)
-        return ssh.open_sftp(), args[1:3]
+        return ssh.open_sftp(), args[:2], remote_dest
+    except IndexError:
+        raise_error("Arguments ssh invalides")
     except:
         raise_error("Imossible de se connecter au serveur SSH.")
 
@@ -92,13 +124,16 @@ def safe_extract_targz(dest_path, archive_name, src_path):
     Extrait l'archive <archive_name> du dossier <dest_path> et renvoi le path du dossier ainsi poduit.
     Si l'archive n'existe pas, renvoi fait comme si l'archive ne contenait qu'un dossier vide
     """
+    basename = src_path.split(os.sep)[-2]
     if os.path.isfile(dest_path + archive_name):
-        with tarfile.open(dest_path + archive_name, "r:gz") as archive:
-            archive.extractall(dest_path)
-            basename = os.path.commonpath(archive.getnames())
+        try:
+            with tarfile.open(dest_path + archive_name, "r:gz") as archive:
+                archive.extractall(dest_path)
+                basename = os.path.commonpath(archive.getnames())
+        except tarfile.ReadError:
+            pass
         os.remove(os.path.join(dest_path, archive_name))
     else:
-        basename = src_path.split(os.sep)[-2]
         os.makedirs(os.path.join(dest_path, basename), 0o700, True)
     return os.path.join(dest_path, basename)
 
@@ -108,8 +143,6 @@ def get_dest_path_by_src_path(src_file_path, src_path, dest_path):
 
 
 def create_targz(dest_path, archive_name):
-    print(dest_path)
-    print(os.path.isfile(os.path.join(dest_path, archive_name)))
     archive = tarfile.open(os.path.join(dest_path, archive_name), 'w:gz')
     for file in rlistdir(dest_path):
         if file != os.path.join(dest_path, archive_name):
@@ -118,10 +151,15 @@ def create_targz(dest_path, archive_name):
 
 
 def main():
+    if '--help' in sys.argv:
+        raise_error(get_help(), 1)
+
+    get_or_create_conf_file(CONFIG_FILE)
+
     arguments = sys.argv[1:]
     json_conf = load_json(CONFIG_FILE)
 
-    ssh, arguments = handle_ssh_args(arguments)
+    ssh, arguments, remote_dest = handle_ssh_args(arguments)
 
     if arguments:
         if not arguments_are_valid(arguments):
@@ -149,12 +187,12 @@ def main():
         created_file = get_dest_path_by_src_path(modified_file, data["src_path"], dest_dir)
         if not os.path.isdir(os.path.split(created_file)[0]):
             os.makedirs(os.path.split(created_file)[0])
-        if ssh:
-            ssh.put(modified_file, created_file)
-        else:
-            shutil.copyfile(modified_file, created_file)
+        shutil.copyfile(modified_file, created_file)
 
     create_targz(data["dest_path"], data["archive_name"])
+
+    if ssh:
+        ssh.put(os.path.join(data["dest_path"], data["archive_name"]), remote_dest)
 
     shutil.rmtree(dest_dir, True)
 
@@ -170,8 +208,10 @@ def signal_handler(sig, frame):
                 f"à l'emplacement suivant : {data['dest_path']}.")
 
 
+signal.signal(signal.SIGINT, signal_handler)
+
 if __name__ == '__main__':
-    signal.signal(signal.SIGINT, signal_handler)
+    debut = time.time()
     try:
         main()
     except PermissionError:
@@ -179,3 +219,5 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
         raise_error("Une erreur inconnue s'est produite")
+    else:
+        raise_error(f"L'opération a été effectuée sans problème en {round(time.time() - debut, 3)} seconde(s)", 0)
